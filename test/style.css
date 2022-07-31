@@ -1,0 +1,90 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #edeeef;
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-rows: 75px auto 75px;
+    min-height: 100vh;
+}
+
+body * {
+    font-family: 'Roboto Mono';
+}
+
+button {
+    border-radius: 0;
+    border: 1px solid gray;
+    height: 30px;
+    margin: 0;
+    background-color: #d5dce1;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #ebf7ff;
+}
+
+button:focus {
+    font-weight: bold;
+    outline: 1px solid gray;
+    border: 1px solid gray !important;
+    background-color: #d1dee7;
+}
+
+button:active {
+    background-color: #c6e2ff;
+    box-shadow: 0 0 5px 1px #769fff 0 0 5px 1px #769fff inset !important;
+    outline: none;
+}
+
+header {
+    width: 100vw;
+    margin: 0;
+    background-color: #a6acb5;
+    display: flex;
+    justify-content: end;
+    flex-wrap: wrap;
+    flex-direction: column;
+}
+
+header h1 {
+    margin: 0;
+    flex-shrink: 0;
+    text-align: center;
+    cursor: pointer;
+}
+
+.buttons-block {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.buttons-block button {
+    flex-grow: 1;
+    position: relative;
+    box-sizing: 5px;
+}
+
+
+.buttons-block button:last-child {
+    border: 1px solid #6e767c;
+}
+
+
+
+footer {
+    width: 100vw;
+    margin: 0;
+    padding: 0;
+    background-color: #a6acb5;
+    border-top: 2px solid #808997;
+    display: flex;
+    justify-content: center;   
+    align-items: flex-start; 
+}
