@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <script
+        src="https://code.jquery.com/jquery-3.6.0.min.js"
+        integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+        crossorigin="anonymous">
+	</script>
+
+    <script src="../src/func.js"></script>
+    <script defer src="js/main.js"></script>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Mono&subset=cyrillic">
+	<link rel="stylesheet" href="css/all.css">
+    <link rel="stylesheet" href="css/sandbox.css">
+</head>
+
+<body>
+    <header>
+        <h1 onclick="javascript:document.location.href = '#'">JS lib name</h1>
+    </header>
+
+    <main>
+        <section class="block">
+            <h4>Это чекбоксы</h4>
+            <input type="checkbox" type="text" name="" class="checkbox">
+        </section>
+
+        <section class="block">
+            <h4>Это текстовые поля ввода</h4>
+            <input type="text" class="txt"/>
+        </section>
+
+        <section class="block data-viewer">
+            <h4>Формат данных:</h4>
+            <textarea readonly id="data-viewer" cols="50" rows="20"></textarea>
+            <br>
+            <textarea name="" id="data-editor" cols="50" rows="20"></textarea>
+        </section>
+    </main>
+
+    <footer>
+        <h1>Footer</h1>
+    </footer>
+</body>
+</html>
