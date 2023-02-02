@@ -57,10 +57,9 @@ const Botode = (() => {
 
 		replaceStorData(oldKeyObj, keyObj) {
 			let stor;
-			console.log(oldKeyObj, keyObj);
 			if (stor = this.storRepeat.get(oldKeyObj)) {
 				this.storRepeat.set(keyObj, stor);
-				this.storRepeat.delete(oldKey);
+				this.storRepeat.delete(oldKeyObj);
 			}
 
 			if (stor = this.storBins.get(oldKeyObj)) {
@@ -151,7 +150,6 @@ const Botode = (() => {
 		 * @param {any} receiver обрабатываемый прокси-объект
 		 */
 		delHandler(target, prop, receiver) {
-			console.log('DEL', prop);
 			let stor = this.storRepeat.get(receiver);
 			if (stor) {
 				for (const sdata of stor) {
@@ -165,10 +163,13 @@ const Botode = (() => {
 			}
 
 			stor = this.storBins.get(receiver);
-			let storData;
-			if ((stor) && (storData = stor.get(prop))) {
-				for (const handler of storData) handler(this.data);
-				stor.delete(prop);
+			let hstor;
+			if (stor) {
+				if (hstor = stor.get(prop))
+					for (const fun of hstor) fun();
+			
+				if ( hstor = stor.get(__StorAction.propALL) )
+					for (const fun of hstor) fun();
 			}
 		}
 
@@ -190,41 +191,16 @@ const Botode = (() => {
 	 * @class
 	 */
 	class __Proxymer {
-		#backTrace = new (class {
-			#current = Object.create(null);
-			#before = Object.create(null);
-
-			add(target, prop, receiver) {
-				if ((!this.#before.target) || (this.#current === receiver)) {
-					this.#before = this.#current
-
-					this.#current = Object.create(null);
-					this.#current.target = target;
-					this.#current.prop = prop;
-					this.#current.receiver = receiver;
-				}
-			}
-
-			call(storAct) {
-				const before = this.#before;
-				if (before.target) {
-					storAct.setBeforeHandler(before.target, before.prop, before.target[before.prop], before.receiver);
-					storAct.setHandler(before.target, before.prop, before.target[before.prop], before.receiver, true);
-				}
-				this.clear();
-			}
-
-			clear() {
-				this.#before = this.#current = Object.create(null);
-			}
-		})();
+		lastGetObj = false;
 
 		/**
 		 * @constructs
 		 * @param {__StorAction} storAct 
 		 */
+
+		proxysSections = new WeakSet();
+
 		constructor(storAct) {
-			this.proxysSections = new WeakSet();
 			this.__storAct = storAct;
 		}
 
@@ -234,9 +210,10 @@ const Botode = (() => {
 		 * @param {any} obj Объект для установки прокси
 		 * @returns Proxy
 		 */
-		build (obj, ) {
+		build (obj) {
 			const proxy = new Proxy(obj, this);
 			this.proxysSections.add(proxy);
+
 			return proxy;
 		}
 
@@ -248,25 +225,22 @@ const Botode = (() => {
 			if (!prop in target.__proto__)
 				return Reflect.get(target, prop, receiver);
 
-			let val = target[prop];
+			const val = target[prop];
 
 			if (val instanceof Object) {
 				if (!this.proxysSections.has(val)) {
 					const newVal = this.build(val);
 					this.__storAct.replaceStorData(val, newVal);
 					target[prop] = newVal;
-					console.log("GET", prop);
 					
+					this.lastGetObj = receiver
 				}
-
-				this.#backTrace.add(target, prop, receiver);
 			}
+
 
 			this.__storAct.getBeforeHandler(target, prop, receiver);
 
-			const reflect = Reflect.get(target, prop, receiver);
-
-			return reflect;
+			return Reflect.get(target, prop, receiver);
 		}
 
 		/**
@@ -279,9 +253,11 @@ const Botode = (() => {
 		 * @param {boolean} deep рекурсивный ли заход в функцию 
 		 * @returns 
 		 */
-		set (target, prop, val, receiver, deep) {console.log('SET!!',deep, prop, val);
+		set (target, prop, val, receiver, deep) {
 			const needRecurse = val instanceof Object;
 			
+			this.lastGetObj = false;
+
 			if ((needRecurse) && (!this.proxysSections.has(val)))
 				val = this.build(val);
 
@@ -292,30 +268,24 @@ const Botode = (() => {
 			if (needRecurse) for (const k in val)
 				this.set(target[prop], k, val[k], receiver[prop], true);
 
-			if (!deep) {
-				this.#backTrace.call(this.__storAct);
-				
-				this.__storAct.setHandler(target, prop, val, receiver);
-			}
+			this.__storAct.setHandler(target, prop, val, receiver);
 
 			return reflect;
 		}
 
 		/**
-		 * Обработсик удаления значения из прокси-обертки
+		 * Обработчик удаления значения из прокси-обертки
 		 */
 		deleteProperty (target, prop) {
-			this.#backTrace.clear();
+			const proxy = this.lastGetObj;
 
-			const storObj = this.proxysSections.get(target);
-			if ((storObj) && (storObj.has(prop))) {
-				storObj.delete(prop)
-				if (!storObj.size) storObj.delete(target);
-			};
+			this.lastGetObj = false;
+
+			const reflect = Reflect.deleteProperty(target, prop);
 
 			this.__storAct.delHandler(target, prop, proxy);
 			
-			return Reflect.deleteProperty(target, prop);
+			return reflect;
 		}
 	}
 
@@ -337,8 +307,22 @@ const Botode = (() => {
 			this.data = this.__proxymer.build(obj);
 		}
 
-		__set(el, handler, v, k, i, addedStor, obj, observeObj) {
-			return this.__binded(el, handler, v, k, i, addedStor, obj, true, null, observeObj);
+		/**
+		 * метод для одностороннего связывания прокси-объекта с DOM
+		 * 
+		 * @param {string | HTMLElement} el DOM элемент или его CSS селектор
+		 * @param {function} handler функция связывания объекта с DOM
+		 * @param {object} v TODO Удалить
+		 * @param {string | object} k ключ (поле) объекта
+		 * @param {number} i счетчик ключей
+		 * @param {Array} addedStor массив ключей (полей) до целевого значения в главном объекте данных
+		 * @param {object} obj объект данных
+		 * @param {object} observeObj прослушимаевый объект, задается когда нужно прослушивать на изменения строго определенный объект
+		 * @param {function} oppositHandler ф-ция обратного вызова действия над элементом 
+		 * @todo Удалить аргумент v, переименовать addedStor
+		 */
+		__set(el, handler, v, k, i, addedStor, obj, observeObj, oppositHandler) {
+			return this.__binded(el, handler, v, k, i, addedStor, obj, true, oppositHandler, observeObj);
 		}
 
 		/**
@@ -346,17 +330,18 @@ const Botode = (() => {
 		 * 
 		 * @param {string | HTMLElement} el DOM элемент или его CSS селектор
 		 * @param {function} handler функция связывания объекта с DOM
-		 * @param {any} v TODO Удалить
-		 * @param {string | any} k ключ (поле) объекта
+		 * @param {object} v TODO Удалить
+		 * @param {string | object} k ключ (поле) объекта
 		 * @param {number} i счетчик ключей
 		 * @param {Array} addedStor массив ключей (полей) до целевого значения в главном объекте данных
-		 * @param {any} obj объект данных
+		 * @param {object} obj объект данных
 		 * @param {boolean} NOToppositBin флаг, использовать ли обратное связывание
-		 * @param {function} bindedOppositHandler отдельная ф-ция для обратного связывания
+		 * @param {function} oppositHandler ф-ция обратного вызова действия над элементом 
+		 * @param {object} observeObj прослушимаевый объект, задается когда нужно прослушивать на изменения строго определенный объект
 		 * @todo Удалить аргумент v, переименовать addedStor
 		 */
-		__binded(el, handler, v, k, i, addedStor, obj, NOToppositBin, bindedOppositHandler, observeObj) {
-			const node = (el instanceof HTMLElement) ? el : document.querySelector(el);
+		__binded(el, handler, v, k, i, addedStor, obj, NOToppositBin, oppositHandler, observeObj) {
+			const node = getNode(el);
 			
 			const data = () => {
 				if (!(addedStor?.length)) return this.data;
@@ -411,23 +396,24 @@ const Botode = (() => {
 			if (!NOToppositBin) {
 				lastObj.node = node;
 				const key = this.__storAct.addOppositBin(lastObj.obj, lastObj.nameProp);
-
-				bindedOppositHandler = bindedOppositHandler || (event => this.__storAct.storOppositBins[key](stack.reduce((acc, el) => acc[el], event.target)));
 				
-				node.addEventListener('input', bindedOppositHandler);
+				node.addEventListener('input', event => this.__storAct.storOppositBins[key](stack.reduce((acc, el) => acc[el], event.target)));
 			}
+
+			if (oppositHandler)
+				node.addEventListener('input', oppositHandler);
 		}
 
 		/**
-		 * метод для двустороннего связывания и иетерации DOM элементов по объекту данных
+		 * метод для (одно/дву)стороннего связывания и иетерации DOM элементов по объекту данных
 		 * 
 		 * @param {string | HTMLElement} els DOM элемент или его CSS селектор
-		 * @param {function} objH функция возвращающая путь до целевого объекта в структуре основного объекта танных
+		 * @param {object} obj целевой объект
 		 * @param {function} methods метод этого же класса для связывания данных с DOM элементом
 		 * @param {function} handler функция определяющяя связывание и иетерацию DOM элементов от данных 
 		 */
 		__repeat(els, data, methods, handler, noStor) {
-			const node = (els instanceof HTMLElement) ? els : document.querySelector(els);
+			const node = getNode(el);
 				
 			const obj = data || this.data;
 			
@@ -462,6 +448,14 @@ const Botode = (() => {
 		return obj;
 	};
 
+	const getNode = selector => {
+		const el = (selector instanceof HTMLElement) ? selector : document.querySelector(selector);
+		if (!el)
+			throw Error('HTMLElement not found! Selector: "'.concat(selector).concat('"'));
+		else
+			return el;
+	}
+
 	return class {
 		#owner;
 
@@ -471,6 +465,14 @@ const Botode = (() => {
 			this.source = this.#owner.source;
 		}
 
+		/**
+		 * метод для двустороннего связывания прокси-объекта с DOM
+		 * 
+		 * @param {string | HTMLElement} querySelector DOM элемент или его CSS селектор
+		 * @param {function} handler функция связывания объекта с DOM
+		 * @param {function} oppositHandler ф-ция обратного вызова действия над элементом 
+		 * @param {object} observeObj прослушимаевый объект, задается когда нужно прослушивать на изменения строго определенный объект
+		 */
 		bind(querySelector, handler, oppositHandler, observeObj) {
 			if ((oppositHandler) && (typeof oppositHandler != 'function'))
 				observeObj = oppositHandler;
@@ -478,14 +480,40 @@ const Botode = (() => {
 			this.#owner.__binded(querySelector, handler, null, null, null, null, null, null, oppositHandler, observeObj);
 		}
 
-		set(querySelector, handler, observeObj) {
-			this.#owner.__set(querySelector, handler, observeObj, null, null, null, null, observeObj);
+		/**
+		 * метод для одностороннего связывания прокси-объекта с DOM
+		 * 
+		 * @param {string | HTMLElement} querySelector DOM элемент или его CSS селектор
+		 * @param {function} handler функция связывания объекта с DOM
+		 * @param {object} observeObj прослушимаевый объект, задается когда нужно прослушивать на изменения строго определенный объект
+		 * @param {function} oppositHandler ф-ция обратного вызова действия над элементом 
+		 */
+		set(querySelector, handler, observeObj, oppositHandler) {
+			this.#owner.__set(querySelector, handler, observeObj, null, null, null, null, observeObj, oppositHandler);
 		}
 
+		/**
+		 * метод для (одно/дву)стороннего связывания и иетерации DOM элементов по объекту данных
+		 * 
+		 * @param {string | HTMLElement} querySelector DOM элемент или его CSS селектор
+		 * @param {object} obj целевой объект
+		 */
 		repeat(querySelector, data) {
 			return createRepeater(querySelector, this.#owner, data);
 		}
 
+		/**
+		 * @desc Возвращает массив состоящий из данного приложеия и его поля `data`
+		 * @returns [this, data]
+		 */
+		sugar() {
+			return [this, this.data];
+		}
+
+		/**
+		 * for tests. Del me!
+		 * @returns __Core
+		 */
 		getOwner() {
 			return this.#owner;
 		}
