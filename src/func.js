@@ -321,7 +321,7 @@ const Botode = (() => {
 		 * @param {function} oppositHandler ф-ция обратного вызова действия над элементом 
 		 * @todo Удалить аргумент v, переименовать addedStor
 		 */
-		__set(el, handler, v, k, i, addedStor, obj, oppositHandler, observeObj) {
+		__set(el, handler, v, k, i, addedStor, obj, observeObj, oppositHandler) {
 			return this.__binded(el, handler, v, k, i, addedStor, obj, true, oppositHandler, observeObj);
 		}
 
@@ -485,11 +485,11 @@ const Botode = (() => {
 		 * 
 		 * @param {string | HTMLElement} querySelector DOM элемент или его CSS селектор
 		 * @param {function} handler функция связывания объекта с DOM
-		 * @param {function} oppositHandler ф-ция обратного вызова действия над элементом 
 		 * @param {object} observeObj прослушимаевый объект, задается когда нужно прослушивать на изменения строго определенный объект
+		 * @param {function} oppositHandler ф-ция обратного вызова действия над элементом 
 		 */
-		set(querySelector, handler, oppositHandler, observeObj) {
-			this.#owner.__set(querySelector, handler, null, null, null, null, null, oppositHandler, observeObj);
+		set(querySelector, handler, observeObj, oppositHandler) {
+			this.#owner.__set(querySelector, handler, observeObj, null, null, null, null, observeObj, oppositHandler);
 		}
 
 		/**
